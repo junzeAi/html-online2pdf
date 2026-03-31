@@ -40,6 +40,19 @@ const FormatToolbar = {
         '#990000', '#993300', '#996600', '#999900', '#006600', '#006666', '#003399', '#330066',
         '#660066', '#cc0066', '#ff3366', '#ff99cc', '#ffcc99', '#ffffcc', '#ccffcc', '#ccffff'
     ],
+    
+    highlighterColors: [
+        { name: '黄色', color: '#ffeb3b' },
+        { name: '绿色', color: '#a5d6a7' },
+        { name: '蓝色', color: '#81d4fa' },
+        { name: '粉色', color: '#f8bbd9' },
+        { name: '橙色', color: '#ffcc80' },
+        { name: '紫色', color: '#ce93d8' },
+        { name: '红色', color: '#ef9a9a' },
+        { name: '青色', color: '#80cbc4' }
+    ],
+    
+    currentHighlighterColor: '#ffeb3b',
 
     init: function() {
         this.iframe = document.getElementById('preview');
@@ -148,6 +161,17 @@ const FormatToolbar = {
                         <span class="color-indicator" style="background: #ffff00;"></span>
                     </button>
                     <div class="dropdown-menu color-picker-dropdown" id="bgColorMenu"></div>
+                </div>
+                <div class="toolbar-dropdown" id="highlighterDropdown">
+                    <button class="dropdown-btn color-picker-btn" title="荧光笔">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M12 3v18"></path>
+                            <path d="M8 7l4-4 4 4"></path>
+                            <rect x="6" y="12" width="12" height="6" fill="currentColor" opacity="0.3"></rect>
+                        </svg>
+                        <span class="color-indicator" style="background: linear-gradient(to bottom, transparent 50%, #ffeb3b 50%);"></span>
+                    </button>
+                    <div class="dropdown-menu color-picker-dropdown" id="highlighterMenu"></div>
                 </div>
             </div>
             
@@ -289,7 +313,124 @@ const FormatToolbar = {
         
         this.createColorPicker('textColorMenu', (color) => this.execCommand('foreColor', color));
         this.createColorPicker('bgColorMenu', (color) => this.execCommand('hiliteColor', color));
+        this.createHighlighterPicker('highlighterMenu');
         console.log('下拉菜单内容已填充');
+    },
+
+    createHighlighterPicker: function(menuId) {
+        const menu = document.getElementById(menuId);
+        if (!menu) {
+            console.error(`找不到 ${menuId}`);
+            return;
+        }
+        
+        const grid = document.createElement('div');
+        grid.className = 'color-grid highlighter-grid';
+        
+        this.highlighterColors.forEach(hl => {
+            const cell = document.createElement('div');
+            cell.className = 'color-cell highlighter-cell';
+            cell.style.background = `linear-gradient(to bottom, transparent 50%, ${hl.color} 50%)`;
+            cell.title = hl.name;
+            cell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.currentHighlighterColor = hl.color;
+                this.applyHighlighter(hl.color);
+                this.updateHighlighterIndicator(hl.color);
+                menu.classList.remove('show');
+            });
+            grid.appendChild(cell);
+        });
+        
+        menu.appendChild(grid);
+        
+        const clearBtn = document.createElement('div');
+        clearBtn.className = 'dropdown-item highlighter-clear';
+        clearBtn.textContent = '清除荧光笔';
+        clearBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.clearHighlighter();
+            menu.classList.remove('show');
+        });
+        menu.appendChild(clearBtn);
+    },
+    
+    updateHighlighterIndicator: function(color) {
+        const indicator = document.querySelector('#highlighterDropdown .color-indicator');
+        if (indicator) {
+            indicator.style.background = `linear-gradient(to bottom, transparent 50%, ${color} 50%)`;
+        }
+    },
+    
+    applyHighlighter: function(color) {
+        const iframe = document.getElementById('preview');
+        if (!iframe || !iframe.contentDocument) return;
+        
+        const doc = iframe.contentDocument;
+        const selection = iframe.contentWindow.getSelection();
+        
+        if (!selection || selection.rangeCount === 0 || selection.toString().trim().length === 0) {
+            return;
+        }
+        
+        const range = selection.getRangeAt(0);
+        const span = doc.createElement('span');
+        span.className = 'highlighter-mark';
+        span.style.background = `linear-gradient(to bottom, transparent 50%, ${color} 50%)`;
+        span.style.padding = '0 2px';
+        span.style.boxDecorationBreak = 'clone';
+        span.style.webkitBoxDecorationBreak = 'clone';
+        
+        try {
+            range.surroundContents(span);
+            selection.removeAllRanges();
+            
+            if (!this.isDoingUndoRedo) {
+                this.saveVisualState();
+            }
+            
+            const content = doc.documentElement.outerHTML;
+            const html = '<!DOCTYPE html>\n' + content;
+            if (window.setEditorContent) {
+                window.setEditorContent(html);
+            }
+        } catch (e) {
+            console.error('荧光笔应用失败:', e);
+        }
+    },
+    
+    clearHighlighter: function() {
+        const iframe = document.getElementById('preview');
+        if (!iframe || !iframe.contentDocument) return;
+        
+        const doc = iframe.contentDocument;
+        const selection = iframe.contentWindow.getSelection();
+        
+        if (!selection || selection.rangeCount === 0) return;
+        
+        const range = selection.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        
+        const highlighterSpans = doc.querySelectorAll('.highlighter-mark');
+        highlighterSpans.forEach(span => {
+            if (range.intersectsNode(span)) {
+                const parent = span.parentNode;
+                while (span.firstChild) {
+                    parent.insertBefore(span.firstChild, span);
+                }
+                parent.removeChild(span);
+            }
+        });
+        
+        if (!this.isDoingUndoRedo) {
+            this.saveVisualState();
+        }
+        
+        const content = doc.documentElement.outerHTML;
+        const html = '<!DOCTYPE html>\n' + content;
+        if (window.setEditorContent) {
+            window.setEditorContent(html);
+        }
     },
 
     createColorPicker: function(menuId, callback) {
