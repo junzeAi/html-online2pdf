@@ -10,20 +10,78 @@ const SIZE_MAP = {
     landscape: { width: 297, height: 210 }
 };
 
+let libsLoaded = false;
+let libsLoading = false;
+
+async function loadLibs() {
+    if (libsLoaded) return true;
+    if (libsLoading) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return libsLoaded;
+    }
+    
+    libsLoading = true;
+    
+    return new Promise((resolve) => {
+        let loaded = 0;
+        const needLoad = 2;
+        
+        const checkDone = () => {
+            loaded++;
+            if (loaded >= needLoad) {
+                libsLoaded = true;
+                libsLoading = false;
+                resolve(true);
+            }
+        };
+        
+        const h2c = document.createElement('script');
+        h2c.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        h2c.onload = checkDone;
+        h2c.onerror = () => {
+            const h2c2 = document.createElement('script');
+            h2c2.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
+            h2c2.onload = checkDone;
+            h2c2.onerror = () => {
+                console.error('html2canvas 加载失败');
+                libsLoading = false;
+                resolve(false);
+            };
+            document.head.appendChild(h2c2);
+        };
+        document.head.appendChild(h2c);
+        
+        const jspdf = document.createElement('script');
+        jspdf.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+        jspdf.onload = checkDone;
+        jspdf.onerror = () => {
+            const jspdf2 = document.createElement('script');
+            jspdf2.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
+            jspdf2.onload = checkDone;
+            jspdf2.onerror = () => {
+                console.error('jsPDF 加载失败');
+                libsLoading = false;
+                resolve(false);
+            };
+            document.head.appendChild(jspdf2);
+        };
+        document.head.appendChild(jspdf);
+    });
+}
+
 async function exportPdf() {
     const exportBtn = document.getElementById('exportPdf');
     const originalText = exportBtn.textContent;
-    exportBtn.textContent = '生成中...';
+    exportBtn.textContent = '加载组件...';
     exportBtn.disabled = true;
     
     try {
-        if (typeof html2canvas === 'undefined') {
-            throw new Error('html2canvas 库未加载，请刷新页面重试');
+        const loaded = await loadLibs();
+        if (!loaded) {
+            throw new Error('PDF组件加载失败，请检查网络连接');
         }
         
-        if (typeof window.jspdf === 'undefined') {
-            throw new Error('jsPDF 库未加载，请刷新页面重试');
-        }
+        exportBtn.textContent = '生成中...';
         
         const iframe = document.getElementById('preview');
         if (!iframe || !iframe.contentDocument) {
