@@ -17,6 +17,14 @@ async function exportPdf() {
     exportBtn.disabled = true;
     
     try {
+        if (typeof html2canvas === 'undefined') {
+            throw new Error('html2canvas 库未加载，请刷新页面重试');
+        }
+        
+        if (typeof window.jspdf === 'undefined') {
+            throw new Error('jsPDF 库未加载，请刷新页面重试');
+        }
+        
         const iframe = document.getElementById('preview');
         if (!iframe || !iframe.contentDocument) {
             throw new Error('预览区域未加载');
