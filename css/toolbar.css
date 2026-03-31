@@ -1,0 +1,561 @@
+/* 固定工具栏 */
+.format-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    position: relative;
+    z-index: 10000;
+    overflow: visible;
+}
+
+.format-toolbar .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-right: 1px solid #444;
+    flex-shrink: 0;
+    overflow: visible;
+    position: relative;
+}
+
+.format-toolbar .toolbar-group:last-child {
+    border-right: none;
+}
+
+.format-toolbar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.format-toolbar::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 2px;
+}
+
+.format-toolbar::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.format-toolbar .toolbar-btn {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.format-toolbar .toolbar-btn:hover {
+    background: #3d3d3d;
+    border-color: #555;
+}
+
+.format-toolbar .toolbar-btn.active {
+    background: #007acc;
+    color: #fff;
+}
+
+.format-toolbar .toolbar-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* 下拉菜单 */
+.toolbar-dropdown {
+    position: relative;
+    display: flex;
+    align-items: center;
+    overflow: visible;
+}
+
+.toolbar-dropdown .dropdown-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    min-width: 50px;
+    white-space: nowrap;
+}
+
+.toolbar-dropdown .dropdown-btn:hover {
+    background: #3d3d3d;
+    border-color: #555;
+}
+
+.toolbar-dropdown .dropdown-btn .arrow {
+    font-size: 10px;
+    margin-left: auto;
+}
+
+.toolbar-dropdown .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 120px;
+    z-index: 99999;
+    display: none;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.toolbar-dropdown .dropdown-menu.show {
+    display: block;
+}
+
+.toolbar-dropdown .dropdown-item {
+    padding: 8px 12px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-dropdown .dropdown-item:hover {
+    background: #3d3d3d;
+}
+
+.toolbar-dropdown .dropdown-item.selected {
+    background: #007acc;
+    color: #fff;
+}
+
+/* 颜色选择器 */
+.color-picker-btn {
+    position: relative;
+    width: 32px;
+    height: 32px;
+}
+
+.color-picker-btn .color-indicator {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 16px;
+    height: 3px;
+    border-radius: 1px;
+}
+
+.color-picker-dropdown {
+    padding: 12px;
+    min-width: 200px;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.color-picker-dropdown .color-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+}
+
+.color-picker-dropdown .color-cell {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.color-picker-dropdown .color-cell:hover {
+    border-color: #fff;
+    transform: scale(1.1);
+}
+
+.color-picker-dropdown .color-section {
+    margin-bottom: 8px;
+}
+
+.color-picker-dropdown .color-section-title {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+/* 浮动快捷菜单 */
+.floating-menu {
+    position: absolute;
+    display: none;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+    gap: 2px;
+    z-index: 9999;
+}
+
+.floating-menu.show {
+    display: flex;
+}
+
+.floating-menu .floating-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.floating-menu .floating-btn:hover {
+    background: #3d3d3d;
+}
+
+.floating-menu .floating-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.floating-menu .divider {
+    width: 1px;
+    background: #444;
+    margin: 4px 4px;
+}
+
+/* 弹窗 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal {
+    background: #2d2d2d;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    min-width: 400px;
+    max-width: 600px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #444;
+}
+
+.modal-header h3 {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.modal-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+}
+
+.modal-close:hover {
+    background: #3d3d3d;
+    color: #fff;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid #444;
+}
+
+/* 表单元素 */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group:last-child {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    color: #ccc;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* 模式切换按钮 */
+.mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 12px;
+    border-left: 1px solid #444;
+    position: sticky;
+    right: 0;
+    background: #2d2d2d;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.mode-switch-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background: #3d3d3d;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.mode-switch-btn:hover {
+    background: #4d4d4d;
+}
+
+.mode-switch-btn.active {
+    background: #007acc;
+    border-color: #007acc;
+    color: #fff;
+}
+
+.mode-switch-btn.visual-btn {
+    background: #2d5a3d;
+    border-color: #3d7a4d;
+}
+
+.mode-switch-btn.visual-btn:hover {
+    background: #3d7a4d;
+}
+
+.mode-switch-btn.visual-btn.active {
+    background: #28a745;
+    border-color: #28a745;
+    color: #fff;
+}
+
+.mode-switch-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.preview-panel.expanded {
+    flex: 1;
+}
+
+/* 模板选择器 */
+.template-modal {
+    min-width: 500px;
+    max-width: 700px;
+}
+
+.template-body {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.template-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.template-category {
+    border-bottom: 1px solid #444;
+    padding-bottom: 15px;
+}
+
+.template-category:last-child {
+    border-bottom: none;
+}
+
+.template-category-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #888;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.template-card {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.template-card:hover {
+    border-color: #007acc;
+    background: #252526;
+}
+
+.template-card-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.template-card-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.template-card-desc {
+    font-size: 12px;
+    color: #888;
+}
+
+.template-delete-btn {
+    margin-top: 10px;
+    padding: 4px 12px;
+    background: transparent;
+    border: 1px solid #e74c3c;
+    border-radius: 4px;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.template-delete-btn:hover {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.template-actions {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #444;
+    display: flex;
+    justify-content: center;
+}
+
+.template-actions .btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 元素工具栏 */
+.element-toolbar {
+    position: absolute;
+    display: none;
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+    gap: 2px;
+    z-index: 9998;
+}
+
+.element-toolbar.show {
+    display: flex;
+}
+
+.element-toolbar-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #ccc;
+    cursor: pointer;
+}
+
+.element-toolbar-btn:hover {
+    background: #3d3d3d;
+}
+
+.element-toolbar-btn svg {
+    width: 16px;
+    height: 16px;
+}

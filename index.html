@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML预览编辑器</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/toolbar.css">
+</head>
+<body>
+    <div class="toolbar" id="toolbar">
+        <button id="exportPdf" class="btn btn-primary">导出PDF</button>
+        <div class="toolbar-group">
+            <label for="margin">边距:</label>
+            <select id="margin">
+                <option value="none">无</option>
+                <option value="narrow">窄 (1cm)</option>
+                <option value="medium" selected>中 (2cm)</option>
+                <option value="wide">宽 (3cm)</option>
+            </select>
+        </div>
+        <div class="toolbar-group">
+            <label for="orientation">方向:</label>
+            <select id="orientation">
+                <option value="portrait" selected>纵向</option>
+                <option value="landscape">横向</option>
+            </select>
+        </div>
+        <button id="refreshPreview" class="btn">刷新预览</button>
+    </div>
+    
+    <div class="container">
+        <div class="editor-panel" id="editorPanel">
+            <div class="panel-header">代码编辑</div>
+            <div id="editor"></div>
+        </div>
+        <div class="preview-panel" id="previewPanel">
+            <iframe id="preview"></iframe>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/toolbar.js"></script>
+    <script src="js/templates.js"></script>
+    <script src="js/preview.js"></script>
+    <script src="js/print.js"></script>
+</body>
+</html>
