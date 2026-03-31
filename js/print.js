@@ -11,64 +11,75 @@ const SIZE_MAP = {
 };
 
 let libsLoaded = false;
-let libsLoading = false;
 
-async function loadLibs() {
-    if (libsLoaded) return true;
-    if (libsLoading) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return libsLoaded;
-    }
-    
-    libsLoading = true;
-    
-    try {
-        await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 
-                         'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js');
-        
-        const _define = window.define;
-        window.define = undefined;
-        
-        try {
-            await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
-                             'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js');
-        } finally {
-            window.define = _define;
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (typeof html2canvas === 'undefined') {
-            throw new Error('html2canvas 加载失败');
-        }
-        if (typeof window.jspdf === 'undefined') {
-            throw new Error('jsPDF 加载失败');
-        }
-        
-        libsLoaded = true;
-        libsLoading = false;
-        return true;
-    } catch (e) {
-        console.error('库加载失败:', e);
-        libsLoading = false;
-        return false;
-    }
-}
-
-function loadScript(primaryUrl, fallbackUrl) {
+async function loadScript(url) {
     return new Promise((resolve, reject) => {
+        console.log('加载脚本:', url);
         const script = document.createElement('script');
-        script.src = primaryUrl;
-        script.onload = () => resolve();
-        script.onerror = () => {
-            const script2 = document.createElement('script');
-            script2.src = fallbackUrl;
-            script2.onload = () => resolve();
-            script2.onerror = () => reject(new Error(`Failed to load: ${fallbackUrl}`));
-            document.head.appendChild(script2);
+        script.src = url;
+        script.crossOrigin = 'anonymous';
+        script.onload = () => {
+            console.log('脚本加载成功:', url);
+            resolve();
+        };
+        script.onerror = (e) => {
+            console.error('脚本加载失败:', url, e);
+            reject(new Error('Failed to load: ' + url));
         };
         document.head.appendChild(script);
     });
+}
+
+async function loadLibs() {
+    if (libsLoaded) return true;
+    
+    const _define = window.define;
+    window.define = undefined;
+    
+    const cdnUrls = [
+        {
+            h2c: 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
+            jspdf: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
+        },
+        {
+            h2c: 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js',
+            jspdf: 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+        },
+        {
+            h2c: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+            jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+        }
+    ];
+    
+    try {
+        for (let i = 0; i < cdnUrls.length; i++) {
+            try {
+                console.log(`尝试CDN源 ${i + 1}/${cdnUrls.length}`);
+                
+                await loadScript(cdnUrls[i].h2c);
+                await loadScript(cdnUrls[i].jspdf);
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                console.log('检查全局变量:', {
+                    html2canvas: typeof html2canvas,
+                    jspdf: typeof window.jspdf
+                });
+                
+                if (typeof html2canvas !== 'undefined' && typeof window.jspdf !== 'undefined') {
+                    console.log('所有库加载成功');
+                    libsLoaded = true;
+                    return true;
+                }
+            } catch (e) {
+                console.error(`CDN源 ${i + 1} 失败:`, e.message);
+            }
+        }
+    } finally {
+        window.define = _define;
+    }
+    
+    return false;
 }
 
 async function exportPdf() {
@@ -80,7 +91,7 @@ async function exportPdf() {
     try {
         const loaded = await loadLibs();
         if (!loaded) {
-            throw new Error('PDF组件加载失败，请检查网络连接');
+            throw new Error('PDF组件加载失败，请检查网络连接后刷新页面重试');
         }
         
         exportBtn.textContent = '生成中...';
