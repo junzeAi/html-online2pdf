@@ -33,6 +33,12 @@ function getPrintStyles() {
                     color-adjust: exact !important;
                 }
                 
+                html, body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+                
                 body,
                 div,
                 section,
@@ -66,6 +72,12 @@ function getPrintStyles() {
                     print-color-adjust: exact !important;
                 }
                 
+                .highlighter-mark {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                }
+                
                 .no-break {
                     page-break-inside: avoid;
                 }
@@ -76,13 +88,42 @@ function getPrintStyles() {
                 *::after {
                     display: block !important;
                 }
+                
+                .edit-selected-element,
+                .edit-hover-element {
+                    outline: none !important;
+                }
             }
         </style>
     `;
 }
 
-function injectPrintStyles() {
-    const content = window.getEditorContent ? window.getEditorContent() : '';
+function getPrintContent() {
+    const iframe = document.getElementById('preview');
+    
+    if (window.FormatToolbar && window.FormatToolbar.isVisualModeActive) {
+        if (iframe && iframe.contentDocument) {
+            const doc = iframe.contentDocument;
+            
+            doc.querySelectorAll('.edit-selected-element').forEach(el => {
+                el.classList.remove('edit-selected-element');
+            });
+            doc.querySelectorAll('.edit-hover-element').forEach(el => {
+                el.classList.remove('edit-hover-element');
+            });
+            
+            const editStyle = doc.getElementById('editHighlightStyle');
+            if (editStyle) editStyle.remove();
+            
+            const html = doc.documentElement.outerHTML;
+            return '<!DOCTYPE html>\n' + html;
+        }
+    }
+    
+    return window.getEditorContent ? window.getEditorContent() : '';
+}
+
+function injectPrintStyles(content) {
     const printStyles = getPrintStyles();
     
     if (content.includes('</head>')) {
@@ -96,26 +137,36 @@ function injectPrintStyles() {
 
 function exportPdf() {
     const iframe = document.getElementById('preview');
-    const contentWithPrintStyles = injectPrintStyles();
+    const rawContent = getPrintContent();
+    const contentWithPrintStyles = injectPrintStyles(rawContent);
     
-    iframe.srcdoc = contentWithPrintStyles;
+    const printIframe = document.createElement('iframe');
+    printIframe.style.position = 'absolute';
+    printIframe.style.top = '-10000px';
+    printIframe.style.left = '-10000px';
+    printIframe.style.width = '210mm';
+    printIframe.style.height = '297mm';
+    printIframe.id = 'printIframe';
+    document.body.appendChild(printIframe);
     
-    alert('提示：在打印对话框中，请勾选"背景图形"选项以保留渐变色和荧光笔效果');
+    printIframe.srcdoc = contentWithPrintStyles;
     
     setTimeout(() => {
         try {
-            const win = iframe.contentWindow;
-            if (win && win.print) {
+            const win = printIframe.contentWindow;
+            if (win) {
                 win.focus();
                 win.print();
-            } else {
-                fallbackPrint(contentWithPrintStyles);
             }
         } catch (e) {
             console.error('打印失败:', e);
             fallbackPrint(contentWithPrintStyles);
         }
-    }, 200);
+        
+        setTimeout(() => {
+            document.body.removeChild(printIframe);
+        }, 1000);
+    }, 500);
 }
 
 function fallbackPrint(content) {
@@ -127,7 +178,7 @@ function fallbackPrint(content) {
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
-        }, 200);
+        }, 500);
     } else {
         alert('无法打开打印窗口，请检查浏览器弹窗设置');
     }
