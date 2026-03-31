@@ -76,17 +76,19 @@ function getPrintStyles() {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
                     color-adjust: exact !important;
+                    position: relative !important;
+                }
+                
+                .highlighter-mark::after {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                    display: block !important;
+                    visibility: visible !important;
                 }
                 
                 .no-break {
                     page-break-inside: avoid;
-                }
-                
-                body::before,
-                body::after,
-                *::before,
-                *::after {
-                    display: block !important;
                 }
                 
                 .edit-selected-element,
@@ -114,6 +116,8 @@ function getPrintContent() {
             
             const editStyle = doc.getElementById('editHighlightStyle');
             if (editStyle) editStyle.remove();
+            
+            window.FormatToolbar.injectHighlighterStyle(doc, window.FormatToolbar.currentHighlighterColor);
             
             const html = doc.documentElement.outerHTML;
             return '<!DOCTYPE html>\n' + html;

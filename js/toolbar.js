@@ -163,13 +163,13 @@ const FormatToolbar = {
                     <div class="dropdown-menu color-picker-dropdown" id="bgColorMenu"></div>
                 </div>
                 <div class="toolbar-dropdown" id="highlighterDropdown">
-                    <button class="dropdown-btn color-picker-btn" title="荧光笔">
+                    <button class="dropdown-btn color-picker-btn highlighter-btn" title="荧光笔">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <path d="M12 3v18"></path>
                             <path d="M8 7l4-4 4 4"></path>
                             <rect x="6" y="12" width="12" height="6" fill="currentColor" opacity="0.3"></rect>
                         </svg>
-                        <span class="color-indicator" style="background: linear-gradient(to bottom, transparent 50%, #ffeb3b 50%);"></span>
+                        <span class="color-indicator highlighter-indicator" data-hl-color="#ffeb3b"></span>
                     </button>
                     <div class="dropdown-menu color-picker-dropdown" id="highlighterMenu"></div>
                 </div>
@@ -330,7 +330,7 @@ const FormatToolbar = {
         this.highlighterColors.forEach(hl => {
             const cell = document.createElement('div');
             cell.className = 'color-cell highlighter-cell';
-            cell.style.background = `linear-gradient(to bottom, transparent 50%, ${hl.color} 50%)`;
+            cell.setAttribute('data-hl-preview', hl.color);
             cell.title = hl.name;
             cell.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -353,12 +353,14 @@ const FormatToolbar = {
             menu.classList.remove('show');
         });
         menu.appendChild(clearBtn);
+        
+        this.updateHighlighterIndicator(this.currentHighlighterColor);
     },
     
     updateHighlighterIndicator: function(color) {
         const indicator = document.querySelector('#highlighterDropdown .color-indicator');
         if (indicator) {
-            indicator.style.background = `linear-gradient(to bottom, transparent 50%, ${color} 50%)`;
+            indicator.setAttribute('data-hl-color', color);
         }
     },
     
@@ -376,14 +378,13 @@ const FormatToolbar = {
         const range = selection.getRangeAt(0);
         const span = doc.createElement('span');
         span.className = 'highlighter-mark';
-        span.style.background = `linear-gradient(to bottom, transparent 50%, ${color} 50%)`;
-        span.style.padding = '0 2px';
-        span.style.boxDecorationBreak = 'clone';
-        span.style.webkitBoxDecorationBreak = 'clone';
+        span.setAttribute('data-hl-color', color);
         
         try {
             range.surroundContents(span);
             selection.removeAllRanges();
+            
+            this.injectHighlighterStyle(doc, color);
             
             if (!this.isDoingUndoRedo) {
                 this.saveVisualState();
@@ -397,6 +398,71 @@ const FormatToolbar = {
         } catch (e) {
             console.error('荧光笔应用失败:', e);
         }
+    },
+    
+    injectHighlighterStyle: function(doc, color) {
+        const existingStyle = doc.getElementById('highlighterStyle');
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+        
+        const allColors = [];
+        doc.querySelectorAll('.highlighter-mark').forEach(el => {
+            const c = el.getAttribute('data-hl-color');
+            if (c && !allColors.includes(c)) {
+                allColors.push(c);
+            }
+        });
+        
+        let cssRules = '';
+        allColors.forEach(c => {
+            const colorClass = this.getColorClass(c);
+            cssRules += `
+.highlighter-mark.hl-${colorClass} {
+    position: relative;
+    display: inline;
+    padding: 0 2px;
+}
+.highlighter-mark.hl-${colorClass}::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45%;
+    background: ${c};
+    z-index: -1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+`;
+        });
+        
+        const style = doc.createElement('style');
+        style.id = 'highlighterStyle';
+        style.textContent = cssRules;
+        doc.head.appendChild(style);
+        
+        doc.querySelectorAll('.highlighter-mark').forEach(el => {
+            const c = el.getAttribute('data-hl-color');
+            if (c) {
+                el.classList.add('hl-' + this.getColorClass(c));
+            }
+        });
+    },
+    
+    getColorClass: function(color) {
+        const colorMap = {
+            '#ffeb3b': 'yellow',
+            '#a5d6a7': 'green',
+            '#81d4fa': 'blue',
+            '#f8bbd9': 'pink',
+            '#ffcc80': 'orange',
+            '#ce93d8': 'purple',
+            '#ef9a9a': 'red',
+            '#80cbc4': 'cyan'
+        };
+        return colorMap[color] || color.replace('#', '');
     },
     
     clearHighlighter: function() {
