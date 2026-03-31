@@ -22,50 +22,52 @@ async function loadLibs() {
     
     libsLoading = true;
     
-    return new Promise((resolve) => {
-        let loaded = 0;
-        const needLoad = 2;
+    try {
+        await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 
+                         'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js');
         
-        const checkDone = () => {
-            loaded++;
-            if (loaded >= needLoad) {
-                libsLoaded = true;
-                libsLoading = false;
-                resolve(true);
-            }
-        };
+        const _define = window.define;
+        window.define = undefined;
         
-        const h2c = document.createElement('script');
-        h2c.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-        h2c.onload = checkDone;
-        h2c.onerror = () => {
-            const h2c2 = document.createElement('script');
-            h2c2.src = 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js';
-            h2c2.onload = checkDone;
-            h2c2.onerror = () => {
-                console.error('html2canvas 加载失败');
-                libsLoading = false;
-                resolve(false);
-            };
-            document.head.appendChild(h2c2);
-        };
-        document.head.appendChild(h2c);
+        try {
+            await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+                             'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js');
+        } finally {
+            window.define = _define;
+        }
         
-        const jspdf = document.createElement('script');
-        jspdf.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-        jspdf.onload = checkDone;
-        jspdf.onerror = () => {
-            const jspdf2 = document.createElement('script');
-            jspdf2.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
-            jspdf2.onload = checkDone;
-            jspdf2.onerror = () => {
-                console.error('jsPDF 加载失败');
-                libsLoading = false;
-                resolve(false);
-            };
-            document.head.appendChild(jspdf2);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (typeof html2canvas === 'undefined') {
+            throw new Error('html2canvas 加载失败');
+        }
+        if (typeof window.jspdf === 'undefined') {
+            throw new Error('jsPDF 加载失败');
+        }
+        
+        libsLoaded = true;
+        libsLoading = false;
+        return true;
+    } catch (e) {
+        console.error('库加载失败:', e);
+        libsLoading = false;
+        return false;
+    }
+}
+
+function loadScript(primaryUrl, fallbackUrl) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = primaryUrl;
+        script.onload = () => resolve();
+        script.onerror = () => {
+            const script2 = document.createElement('script');
+            script2.src = fallbackUrl;
+            script2.onload = () => resolve();
+            script2.onerror = () => reject(new Error(`Failed to load: ${fallbackUrl}`));
+            document.head.appendChild(script2);
         };
-        document.head.appendChild(jspdf);
+        document.head.appendChild(script);
     });
 }
 
@@ -137,7 +139,15 @@ async function exportPdf() {
         
         document.body.removeChild(container);
         
-        const { jsPDF } = window.jspdf;
+        let jsPDF;
+        if (window.jspdf && window.jspdf.jsPDF) {
+            jsPDF = window.jspdf.jsPDF;
+        } else if (window.jsPDF) {
+            jsPDF = window.jsPDF;
+        } else {
+            throw new Error('jsPDF 未正确加载');
+        }
+        
         const pdf = new jsPDF({
             orientation: orientationSelect.value === 'landscape' ? 'landscape' : 'portrait',
             unit: 'mm',
