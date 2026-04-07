@@ -144,17 +144,13 @@ function initPreview() {
     window.onModeChange = function(mode) {
         isVisualMode = mode === 'visual';
     };
-
-    const refreshBtn = document.getElementById('refreshPreview');
-    if (!refreshBtn) {
-        console.error('找不到刷新预览按钮 #refreshPreview');
-        return;
-    }
-    refreshBtn.addEventListener('click', function() {
+    
+    window.refreshPreview = function() {
         clearTimeout(debounceTimer);
         updatePreview();
-    });
-    console.log('刷新预览按钮事件绑定成功');
+    };
+
+    console.log('预览初始化完成');
 }
 
 if (document.readyState === 'loading') {

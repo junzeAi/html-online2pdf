@@ -8,13 +8,21 @@ function initEditor() {
             value: getDefaultTemplate(),
             language: 'html',
             theme: 'vs-dark',
-            automaticLayout: true,
+            automaticLayout: false,
             fontSize: 14,
             lineNumbers: 'on',
             minimap: { enabled: false },
             wordWrap: 'on',
             scrollBeyondLastLine: false,
             tabSize: 2
+        });
+
+        window.MonacoEditor = editor;
+
+        window.addEventListener('resize', function() {
+            if (editor) {
+                editor.layout();
+            }
         });
 
         editor.onDidChangeModelContent(() => {
@@ -69,7 +77,18 @@ function getEditorContent() {
 
 function setEditorContent(content) {
     if (editor) {
-        editor.setValue(content);
+        const model = editor.getModel();
+        if (model) {
+            editor.pushUndoStop();
+            model.pushEditOperations(
+                [],
+                [{ range: model.getFullModelRange(), text: content }],
+                null
+            );
+            editor.pushUndoStop();
+        } else {
+            editor.setValue(content);
+        }
     }
 }
 
@@ -77,6 +96,7 @@ window.getEditorContent = getEditorContent;
 window.setEditorContent = setEditorContent;
 window.locateTextInEditor = locateTextInEditor;
 window.getEditor = function() { return editor; };
+window.MonacoEditor = null;
 
 initEditor();
 

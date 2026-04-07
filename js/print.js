@@ -1,231 +1,26 @@
-const MARGIN_MAP = {
-    none: 0,
-    narrow: 10,
-    medium: 20,
-    wide: 30
-};
-
-const SIZE_MAP = {
-    portrait: { width: 210, height: 297 },
-    landscape: { width: 297, height: 210 }
-};
-
-let libsLoaded = false;
-
-async function loadScript(url) {
-    return new Promise((resolve, reject) => {
-        console.log('加载脚本:', url);
-        const script = document.createElement('script');
-        script.src = url;
-        script.crossOrigin = 'anonymous';
-        script.onload = () => {
-            console.log('脚本加载成功:', url);
-            resolve();
-        };
-        script.onerror = (e) => {
-            console.error('脚本加载失败:', url, e);
-            reject(new Error('Failed to load: ' + url));
-        };
-        document.head.appendChild(script);
-    });
-}
-
-async function loadLibs() {
-    if (libsLoaded) return true;
-    
-    const _define = window.define;
-    window.define = undefined;
-    
-    const cdnUrls = [
-        {
-            h2c: 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
-            jspdf: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'
-        },
-        {
-            h2c: 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js',
-            jspdf: 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
-        },
-        {
-            h2c: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-            jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
-        }
-    ];
-    
-    try {
-        for (let i = 0; i < cdnUrls.length; i++) {
-            try {
-                console.log(`尝试CDN源 ${i + 1}/${cdnUrls.length}`);
-                
-                await loadScript(cdnUrls[i].h2c);
-                await loadScript(cdnUrls[i].jspdf);
-                
-                await new Promise(resolve => setTimeout(resolve, 300));
-                
-                console.log('检查全局变量:', {
-                    html2canvas: typeof html2canvas,
-                    jspdf: typeof window.jspdf
-                });
-                
-                if (typeof html2canvas !== 'undefined' && typeof window.jspdf !== 'undefined') {
-                    console.log('所有库加载成功');
-                    libsLoaded = true;
-                    return true;
-                }
-            } catch (e) {
-                console.error(`CDN源 ${i + 1} 失败:`, e.message);
-            }
-        }
-    } finally {
-        window.define = _define;
+function exportPdf() {
+    const iframe = document.getElementById('preview');
+    if (!iframe || !iframe.contentDocument) {
+        alert('预览区域未加载');
+        return;
     }
     
-    return false;
-}
-
-async function exportPdf() {
-    const exportBtn = document.getElementById('exportPdf');
-    const originalText = exportBtn.textContent;
-    exportBtn.textContent = '加载组件...';
-    exportBtn.disabled = true;
+    const selectedElements = iframe.contentDocument.querySelectorAll('.edit-selected-element, .edit-hover-element');
+    selectedElements.forEach(el => {
+        el.classList.remove('edit-selected-element', 'edit-hover-element');
+    });
     
     try {
-        const loaded = await loadLibs();
-        if (!loaded) {
-            throw new Error('PDF组件加载失败，请检查网络连接后刷新页面重试');
-        }
-        
-        exportBtn.textContent = '生成中...';
-        
-        const iframe = document.getElementById('preview');
-        if (!iframe || !iframe.contentDocument) {
-            throw new Error('预览区域未加载');
-        }
-        
-        const marginSelect = document.getElementById('margin');
-        const orientationSelect = document.getElementById('orientation');
-        const margin = MARGIN_MAP[marginSelect.value] || 20;
-        const size = SIZE_MAP[orientationSelect.value] || SIZE_MAP.portrait;
-        
-        const doc = iframe.contentDocument;
-        const body = doc.body;
-        
-        const selectedElements = doc.querySelectorAll('.edit-selected-element, .edit-hover-element');
-        selectedElements.forEach(el => {
-            el.classList.remove('edit-selected-element', 'edit-hover-element');
-        });
-        
-        if (window.FormatToolbar) {
-            window.FormatToolbar.injectHighlighterStyle(doc, window.FormatToolbar.currentHighlighterColor);
-        }
-        
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = '794px';
-        container.style.background = '#fff';
-        container.style.zIndex = '-9999';
-        container.style.padding = '20px';
-        container.style.fontFamily = "'Microsoft YaHei', sans-serif";
-        
-        container.innerHTML = body.innerHTML;
-        
-        const styles = doc.querySelectorAll('style');
-        const styleText = Array.from(styles).map(s => s.textContent).join('\n');
-        const styleEl = document.createElement('style');
-        styleEl.textContent = styleText;
-        container.insertBefore(styleEl, container.firstChild);
-        
-        document.body.appendChild(container);
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        const canvas = await html2canvas(container, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false
-        });
-        
-        document.body.removeChild(container);
-        
-        let jsPDF;
-        if (window.jspdf && window.jspdf.jsPDF) {
-            jsPDF = window.jspdf.jsPDF;
-        } else if (window.jsPDF) {
-            jsPDF = window.jsPDF;
-        } else {
-            throw new Error('jsPDF 未正确加载');
-        }
-        
-        const pdf = new jsPDF({
-            orientation: orientationSelect.value === 'landscape' ? 'landscape' : 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
-        
-        const pageWidth = size.width - margin * 2;
-        const pageHeight = size.height - margin * 2;
-        
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height * pageWidth) / canvas.width;
-        
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        
-        if (imgHeight <= pageHeight) {
-            pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
-        } else {
-            let position = 0;
-            let remainingHeight = imgHeight;
-            let pageNumber = 1;
-            
-            while (remainingHeight > 0) {
-                if (pageNumber > 1) {
-                    pdf.addPage();
-                }
-                
-                const sourceY = (position * canvas.width) / pageWidth;
-                const sourceHeight = Math.min(pageHeight, remainingHeight);
-                const sourceHeightPx = (sourceHeight * canvas.width) / pageWidth;
-                
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = sourceHeightPx;
-                const ctx = tempCanvas.getContext('2d');
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeightPx, 0, 0, canvas.width, sourceHeightPx);
-                
-                const pageImgData = tempCanvas.toDataURL('image/png', 1.0);
-                pdf.addImage(pageImgData, 'PNG', margin, margin, imgWidth, sourceHeight);
-                
-                position += sourceHeight;
-                remainingHeight -= sourceHeight;
-                pageNumber++;
-            }
-        }
-        
-        const timestamp = new Date().toISOString().slice(0, 10);
-        pdf.save(`document-${timestamp}.pdf`);
-        
-    } catch (error) {
-        console.error('PDF导出失败:', error);
-        alert('PDF导出失败: ' + error.message);
-    } finally {
-        exportBtn.textContent = originalText;
-        exportBtn.disabled = false;
+        iframe.contentWindow.print();
+    } catch (e) {
+        console.error('打印失败:', e);
+        alert('请使用浏览器打印功能（Ctrl+P），或尝试在新窗口中打开预览后打印');
     }
 }
 
 function initPrint() {
-    const exportPdfBtn = document.getElementById('exportPdf');
-    if (!exportPdfBtn) {
-        console.error('找不到导出PDF按钮 #exportPdf');
-        return;
-    }
-    exportPdfBtn.addEventListener('click', exportPdf);
-    console.log('导出PDF按钮事件绑定成功');
+    window.exportPdf = exportPdf;
+    console.log('PDF导出功能初始化完成');
 }
 
 if (document.readyState === 'loading') {

@@ -66,20 +66,19 @@ const FormatToolbar = {
         this.createFloatingMenu();
         this.bindEvents();
         console.log('FormatToolbar 初始化成功');
-        
-        setTimeout(() => {
-            if (window.TemplateManager) {
-                window.TemplateManager.addToolbarButton();
-            }
-        }, 50);
     },
 
     createToolbar: function() {
+        const header = document.createElement('div');
+        header.className = 'app-header';
+        header.innerHTML = '<div class="app-title">钧泽Ai教育-html编辑器</div>';
+        
         const toolbar = document.createElement('div');
         toolbar.className = 'format-toolbar';
         toolbar.id = 'formatToolbar';
         
         toolbar.innerHTML = `
+            <div class="format-toolbar-center">
             <div class="toolbar-group">
                 <button class="toolbar-btn" id="undoBtn" title="撤销 (Ctrl+Z)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -247,6 +246,38 @@ const FormatToolbar = {
                 </button>
             </div>
             
+            <div class="toolbar-group" id="fileOperationsGroup">
+                <button class="toolbar-btn" id="templateBtn" title="选择模板">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                        <line x1="9" y1="9" x2="9" y2="21"></line>
+                    </svg>
+                </button>
+                <button class="toolbar-btn" id="importHtmlBtn" title="导入HTML">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+                <button class="toolbar-btn" id="exportPdfBtn" title="导出PDF">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </button>
+                <button class="toolbar-btn" id="refreshPreviewBtn" title="刷新预览">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                    </svg>
+                </button>
+            </div>
+            </div>
+            
             <div class="mode-switch">
                 <button class="mode-switch-btn active" id="codeModeBtn" title="代码模式">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -268,8 +299,10 @@ const FormatToolbar = {
         const container = document.querySelector('.container');
         if (container) {
             container.parentNode.insertBefore(toolbar, container);
+            container.parentNode.insertBefore(header, toolbar);
         } else {
             document.body.insertBefore(toolbar, document.body.firstChild);
+            document.body.insertBefore(header, toolbar);
         }
         
         this.populateDropdowns();
@@ -585,18 +618,15 @@ const FormatToolbar = {
         document.querySelectorAll('.toolbar-dropdown .dropdown-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                console.log('点击下拉按钮');
                 const dropdown = btn.parentElement;
                 const menu = dropdown.querySelector('.dropdown-menu');
-                if (!menu) {
-                    console.error('找不到下拉菜单');
-                    return;
-                }
+                if (!menu) return;
+                
                 const isOpen = menu.classList.contains('show');
                 document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+                
                 if (!isOpen) {
                     menu.classList.add('show');
-                    console.log('打开下拉菜单');
                 }
             });
         });
@@ -654,6 +684,58 @@ const FormatToolbar = {
             console.log('插入表格按钮事件已绑定');
         } else {
             console.error('找不到插入表格按钮 #insertTableBtn');
+        }
+        
+        const templateBtn = document.getElementById('templateBtn');
+        if (templateBtn) {
+            templateBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('模板按钮被点击');
+                if (window.TemplateManager) {
+                    console.log('TemplateManager 存在，调用 showTemplateSelector');
+                    window.TemplateManager.showTemplateSelector();
+                } else {
+                    console.error('TemplateManager 不存在');
+                }
+            });
+            console.log('模板按钮事件已绑定');
+        } else {
+            console.error('找不到模板按钮 #templateBtn');
+        }
+        
+        const importHtmlBtn = document.getElementById('importHtmlBtn');
+        if (importHtmlBtn) {
+            importHtmlBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('htmlFileInput');
+                if (fileInput) {
+                    fileInput.click();
+                }
+            });
+            console.log('导入HTML按钮事件已绑定');
+        }
+        
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+        if (exportPdfBtn) {
+            exportPdfBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (window.exportPdf) {
+                    window.exportPdf();
+                }
+            });
+            console.log('导出PDF按钮事件已绑定');
+        }
+        
+        const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
+        if (refreshPreviewBtn) {
+            refreshPreviewBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (window.refreshPreview) {
+                    window.refreshPreview();
+                }
+            });
+            console.log('刷新预览按钮事件已绑定');
         }
         
         const self = this;
