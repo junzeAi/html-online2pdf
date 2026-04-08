@@ -6,8 +6,58 @@
     <title>HTML预览编辑器</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/toolbar.css">
+    <style>
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s;
+        }
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #444;
+            border-top-color: #007acc;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-text {
+            color: #ccc;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .loading-tip {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+    <script>
+        window.MONACO_CDN = 'https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.45.0/min/vs';
+    </script>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在加载编辑器...</div>
+        <div class="loading-tip">首次加载可能需要几秒钟</div>
+    </div>
+    
     <input type="file" id="htmlFileInput" accept=".html,.htm" style="display:none;">
     
     <div class="container">
@@ -20,12 +70,25 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
-    <script src="js/editor.js"></script>
-    <script src="js/import.js"></script>
-    <script src="js/toolbar.js"></script>
-    <script src="js/templates.js"></script>
-    <script src="js/preview.js"></script>
-    <script src="js/print.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.45.0/min/vs/loader.js"></script>
+    <script src="js/editor.js" defer></script>
+    <script src="js/import.js" defer></script>
+    <script src="js/toolbar.js" defer></script>
+    <script src="js/templates.js" defer></script>
+    <script src="js/preview.js" defer></script>
+    <script src="js/print.js" defer></script>
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.classList.add('hidden');
+                    setTimeout(function() {
+                        overlay.remove();
+                    }, 300);
+                }
+            }, 500);
+        });
+    </script>
 </body>
 </html>

@@ -399,25 +399,45 @@ const FormatToolbar = {
     
     applyHighlighter: function(color) {
         const iframe = document.getElementById('preview');
-        if (!iframe || !iframe.contentDocument) return;
+        if (!iframe || !iframe.contentDocument) {
+            alert('预览区域未加载');
+            return;
+        }
         
         const doc = iframe.contentDocument;
         const selection = iframe.contentWindow.getSelection();
         
-        if (!selection || selection.rangeCount === 0 || selection.toString().trim().length === 0) {
+        if (!selection || selection.rangeCount === 0) {
+            alert('请先选择要标记的文本');
+            return;
+        }
+        
+        const selectedText = selection.toString().trim();
+        if (selectedText.length === 0) {
+            alert('请先选择要标记的文本');
             return;
         }
         
         const range = selection.getRangeAt(0);
-        const span = doc.createElement('span');
-        span.className = 'highlighter-mark';
-        span.setAttribute('data-hl-color', color);
+        
+        this.injectPrintStyle(doc);
         
         try {
-            range.surroundContents(span);
-            selection.removeAllRanges();
+            const span = doc.createElement('span');
+            span.className = 'highlighter-mark';
+            span.setAttribute('data-hl-color', color);
+            span.style.cssText = `background: linear-gradient(to bottom, transparent 50%, ${color} 50%); -webkit-print-color-adjust: exact; print-color-adjust: exact;`;
             
-            this.injectHighlighterStyle(doc, color);
+            try {
+                range.surroundContents(span);
+            } catch (e) {
+                console.warn('surroundContents 失败，使用复杂选区处理:', e);
+                const fragment = range.extractContents();
+                span.appendChild(fragment);
+                range.insertNode(span);
+            }
+            
+            selection.removeAllRanges();
             
             if (!this.isDoingUndoRedo) {
                 this.saveVisualState();
@@ -430,58 +450,28 @@ const FormatToolbar = {
             }
         } catch (e) {
             console.error('荧光笔应用失败:', e);
+            alert('荧光笔应用失败，请重新选择文本后重试');
         }
     },
     
-    injectHighlighterStyle: function(doc, color) {
-        const existingStyle = doc.getElementById('highlighterStyle');
-        if (existingStyle) {
-            existingStyle.remove();
-        }
-        
-        const allColors = [];
-        doc.querySelectorAll('.highlighter-mark').forEach(el => {
-            const c = el.getAttribute('data-hl-color');
-            if (c && !allColors.includes(c)) {
-                allColors.push(c);
-            }
-        });
-        
-        let cssRules = '';
-        allColors.forEach(c => {
-            const colorClass = this.getColorClass(c);
-            cssRules += `
-.highlighter-mark.hl-${colorClass} {
-    position: relative;
-    display: inline;
-    padding: 0 2px;
-}
-.highlighter-mark.hl-${colorClass}::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 45%;
-    background: ${c};
-    z-index: -1;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-}
-`;
-        });
+    injectPrintStyle: function(doc) {
+        const existingStyle = doc.getElementById('printStyle');
+        if (existingStyle) return;
         
         const style = doc.createElement('style');
-        style.id = 'highlighterStyle';
-        style.textContent = cssRules;
-        doc.head.appendChild(style);
-        
-        doc.querySelectorAll('.highlighter-mark').forEach(el => {
-            const c = el.getAttribute('data-hl-color');
-            if (c) {
-                el.classList.add('hl-' + this.getColorClass(c));
+        style.id = 'printStyle';
+        style.textContent = `
+            @media print {
+                .highlighter-mark {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
             }
-        });
+        `;
+        doc.head.appendChild(style);
+    },
+    
+    injectHighlighterStyle: function(doc, color) {
     },
     
     getColorClass: function(color) {
@@ -505,7 +495,10 @@ const FormatToolbar = {
         const doc = iframe.contentDocument;
         const selection = iframe.contentWindow.getSelection();
         
-        if (!selection || selection.rangeCount === 0) return;
+        if (!selection || selection.rangeCount === 0) {
+            alert('请先选择要清除荧光笔的文本');
+            return;
+        }
         
         const range = selection.getRangeAt(0);
         const container = range.commonAncestorContainer;
@@ -720,11 +713,11 @@ const FormatToolbar = {
         if (exportPdfBtn) {
             exportPdfBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (window.exportPdf) {
-                    window.exportPdf();
-                }
+                this.showExportDialog();
             });
-            console.log('导出PDF按钮事件已绑定');
+            console.log('导出按钮事件已绑定');
+        } else {
+            console.error('找不到导出按钮 #exportPdfBtn');
         }
         
         const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
@@ -1180,6 +1173,56 @@ syncToEditor: function() {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) overlay.classList.remove('show');
         });
+    },
+
+    showExportDialog: function() {
+        this.showModal('选择导出格式', `
+            <div class="export-options">
+                <button class="export-option" id="exportPdfOption">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <div>
+                        <div class="export-option-title">导出 PDF</div>
+                        <div class="export-option-desc">使用浏览器打印功能导出为PDF文件</div>
+                    </div>
+                </button>
+                <button class="export-option" id="exportHtmlOption">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    <div>
+                        <div class="export-option-title">导出 HTML</div>
+                        <div class="export-option-desc">下载当前的HTML源代码文件</div>
+                    </div>
+                </button>
+            </div>
+        `, null);
+        
+        const exportPdfOption = document.getElementById('exportPdfOption');
+        if (exportPdfOption) {
+            exportPdfOption.addEventListener('click', () => {
+                document.getElementById('modalOverlay').classList.remove('show');
+                if (window.exportPdf) {
+                    window.exportPdf();
+                }
+            });
+        }
+        
+        const exportHtmlOption = document.getElementById('exportHtmlOption');
+        if (exportHtmlOption) {
+            exportHtmlOption.addEventListener('click', () => {
+                document.getElementById('modalOverlay').classList.remove('show');
+                if (window.exportHtml) {
+                    window.exportHtml();
+                }
+            });
+        }
     },
 
     switchMode: function(mode) {

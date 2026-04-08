@@ -1,7 +1,8 @@
 let editor = null;
 
 function initEditor() {
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    const cdnUrl = window.MONACO_CDN || 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs';
+    require.config({ paths: { vs: cdnUrl } });
     
     require(['vs/editor/editor.main'], function () {
         editor = monaco.editor.create(document.getElementById('editor'), {
