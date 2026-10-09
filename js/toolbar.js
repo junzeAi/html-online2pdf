@@ -65,6 +65,14 @@ const FormatToolbar = {
         this.createToolbar();
         this.createFloatingMenu();
         this.bindEvents();
+
+        // 属性面板：仅可视化模式下有效，选中元素时展开
+        if (window.PropertyPanel && !window.PropertyPanel.__initialized) {
+            window.PropertyPanel.__initialized = true;
+            window.PropertyPanel.init();
+            window.PropertyPanel.setVisible(false);
+        }
+
         console.log('FormatToolbar 初始化成功');
     },
 
@@ -257,15 +265,15 @@ const FormatToolbar = {
                 <button class="toolbar-btn" id="importHtmlBtn" title="导入HTML">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
                 </button>
                 <button class="toolbar-btn" id="exportPdfBtn" title="导出PDF">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
                 </button>
                 <button class="toolbar-btn" id="refreshPreviewBtn" title="刷新预览">
@@ -443,9 +451,8 @@ const FormatToolbar = {
                 this.saveVisualState();
             }
             
-            const content = doc.documentElement.outerHTML;
-            const html = '<!DOCTYPE html>\n' + content;
-            if (window.setEditorContent) {
+            const html = this.getCleanHTML(doc);
+            if (html && window.setEditorContent) {
                 window.setEditorContent(html);
             }
         } catch (e) {
@@ -518,9 +525,8 @@ const FormatToolbar = {
             this.saveVisualState();
         }
         
-        const content = doc.documentElement.outerHTML;
-        const html = '<!DOCTYPE html>\n' + content;
-        if (window.setEditorContent) {
+        const html = this.getCleanHTML(doc);
+        if (html && window.setEditorContent) {
             window.setEditorContent(html);
         }
     },
@@ -755,14 +761,18 @@ const FormatToolbar = {
         }
         
         document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z' && !e.shiftKey) {
-                    e.preventDefault();
-                    self.undo();
-                } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-                    e.preventDefault();
-                    self.redo();
-                }
+            if (!(e.ctrlKey || e.metaKey)) return;
+            if (e.key !== 'z' && e.key !== 'y') return;
+            // 焦点在 Monaco / 输入框内时交由对应控件自行处理，
+            // 否则会与 Monaco 原生撤销叠加（一次按键回退两步）。
+            // 注：焦点在预览 iframe 内时事件不会冒泡到本文档，由 iframe 内监听器处理。
+            if (self.isEditingContext(e.target)) return;
+
+            e.preventDefault();
+            if (e.key === 'z' && !e.shiftKey) {
+                self.undo();
+            } else {
+                self.redo();
             }
         });
         
@@ -789,6 +799,16 @@ const FormatToolbar = {
         }
         
         console.log('FormatToolbar 所有事件绑定完成');
+    },
+
+    isEditingContext: function(target) {
+        if (!target) return false;
+        if (this.iframe && (target === this.iframe || this.iframe.contains(target))) return true;
+        if (target.closest && target.closest('#editor')) return true;
+        const tag = (target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+        if (target.isContentEditable) return true;
+        return false;
     },
 
     execCommand: function(command, value = null) {
@@ -819,9 +839,8 @@ const FormatToolbar = {
             try {
                 doc.execCommand(command, false, value);
                 
-                const content = doc.documentElement.outerHTML;
-                const html = '<!DOCTYPE html>\n' + content;
-                if (window.setEditorContent) {
+                const html = this.getCleanHTML(doc);
+                if (html && window.setEditorContent) {
                     window.setEditorContent(html);
                 }
                 
@@ -838,21 +857,27 @@ const FormatToolbar = {
     },
     
     execCommandInCodeMode: function(command, value, doc) {
+        // 用 finally 保证 contentEditable 一定复位：
+        // execCommand 一旦抛错就会残留可编辑状态，导致预览区可改但源码不更新，静默分叉
         try {
             doc.body.contentEditable = true;
             doc.execCommand(command, false, value);
-            doc.body.contentEditable = false;
-            
-            const content = doc.documentElement.outerHTML;
-            const html = '<!DOCTYPE html>\n' + content;
-            if (window.setEditorContent) {
-                window.setEditorContent(html);
-            }
-            console.log(`代码模式命令 "${command}" 执行成功`);
-            return;
         } catch(e) {
             console.error('iframe execCommand 失败:', e);
             alert('格式化功能暂时不可用，请尝试可视化模式');
+            return;
+        } finally {
+            doc.body.contentEditable = false;
+        }
+
+        try {
+            const html = this.getCleanHTML(doc);
+            if (html && window.setEditorContent) {
+                window.setEditorContent(html);
+            }
+            console.log(`代码模式命令 "${command}" 执行成功`);
+        } catch(e) {
+            console.error('同步源码失败:', e);
         }
     },
     
@@ -902,9 +927,8 @@ const FormatToolbar = {
                     iframe.contentDocument.body.innerHTML = newContent;
                     this.isDoingUndoRedo = false;
                     
-                    const content = iframe.contentDocument.documentElement.outerHTML;
-                    const html = '<!DOCTYPE html>\n' + content;
-                    if (window.setEditorContent) {
+                    const html = this.getCleanHTML(iframe.contentDocument);
+                    if (html && window.setEditorContent) {
                         window.setEditorContent(html);
                     }
                     console.log('可视化模式撤销成功');
@@ -938,9 +962,8 @@ const FormatToolbar = {
                     iframe.contentDocument.body.innerHTML = newContent;
                     this.isDoingUndoRedo = false;
                     
-                    const content = iframe.contentDocument.documentElement.outerHTML;
-                    const html = '<!DOCTYPE html>\n' + content;
-                    if (window.setEditorContent) {
+                    const html = this.getCleanHTML(iframe.contentDocument);
+                    if (html && window.setEditorContent) {
                         window.setEditorContent(html);
                     }
                     console.log('可视化模式恢复成功');
@@ -967,21 +990,38 @@ const FormatToolbar = {
         if (label) label.textContent = fontName;
     },
 
+// 生成纯净的文档 HTML：剔除编辑器注入的临时样式与编辑高亮标记，
+    // 否则这些 CSS 会被同步回编辑器源码，或混进导出的 HTML 文件里
+    getCleanHTML: function(doc) {
+        const target = doc || this.iframeDoc ||
+            (this.iframe && (this.iframe.contentDocument || this.iframe.contentWindow.document));
+        if (!target || !target.documentElement) return '';
+
+        const clone = target.documentElement.cloneNode(true);
+        clone.querySelectorAll(
+            'style#editHighlightStyle, style#printStyle, style#syncStatusStyle'
+        ).forEach(function(el) { el.remove(); });
+        clone.querySelectorAll('.edit-selected-element, .edit-hover-element')
+            .forEach(function(el) {
+                el.classList.remove('edit-selected-element', 'edit-hover-element');
+            });
+
+        return '<!DOCTYPE html>\n' + clone.outerHTML;
+    },
+
 syncToEditor: function() {
         if (!this.iframeDoc) {
             console.warn('syncToEditor: iframeDoc 未找到');
             return;
         }
-        
+
         if (this.isVisualModeActive && !this.isDoingUndoRedo) {
             console.log('syncToEditor: 保存可视化状态');
             this.saveVisualState();
         }
-        
-        const content = this.iframeDoc.documentElement.outerHTML;
-        const html = '<!DOCTYPE html>\n' + content;
-        
-        if (window.setEditorContent) {
+
+        const html = this.getCleanHTML(this.iframeDoc);
+        if (html && window.setEditorContent) {
             window.setEditorContent(html);
         }
     },
@@ -1242,6 +1282,7 @@ syncToEditor: function() {
             if (codeBtn) codeBtn.classList.remove('active');
             if (visualBtn) visualBtn.classList.add('active');
             this.isVisualModeActive = true;
+            if (window.PropertyPanel) window.PropertyPanel.setVisible(true);
             
             this.iframeDoc = null;
             try {
@@ -1269,11 +1310,83 @@ syncToEditor: function() {
             if (codeBtn) codeBtn.classList.add('active');
             if (visualBtn) visualBtn.classList.remove('active');
             this.isVisualModeActive = false;
+            if (window.PropertyPanel) window.PropertyPanel.setVisible(false);
             this.disableVisualEditing();
+            // Monaco 是按需加载的：进入代码模式时才拉起，避免它拖慢首屏
+            this.ensureCodeEditor();
             console.log('已切换到代码模式');
         }
         
         if (window.onModeChange) window.onModeChange(mode);
+    },
+
+    /**
+     * 确保代码编辑器可用。
+     * Monaco 体积很大（3.4MB），因此不在首屏加载，只有用户真正
+     * 切到代码模式时才载入；加载期间在 #editor 内显示进度。
+     */
+    ensureCodeEditor: function() {
+        const host = document.getElementById('editor');
+        const self = this;
+
+        // 尚未就绪时才铺加载占位（就绪后 host 里是 Monaco 的 DOM，不能动）
+        if (host && !(window.isMonacoReady && window.isMonacoReady())) {
+            host.innerHTML =
+                '<div class="editor-loading">' +
+                '<div class="editor-loading-spinner"></div>' +
+                '<div class="editor-loading-text">正在加载代码编辑器…</div>' +
+                '<div class="editor-loading-tip">首次加载约需数秒，之后浏览器会缓存</div>' +
+                '</div>';
+        }
+
+        if (!window.ensureMonacoEditor) {
+            if (host) {
+                host.innerHTML =
+                    '<div class="editor-error">代码编辑器模块未就绪，请刷新页面重试。</div>';
+            }
+            return;
+        }
+
+        window.ensureMonacoEditor().then(function () {
+            // 用户可能在加载期间又切回了可视化模式
+            if (self.isVisualModeActive) return;
+            if (window.layoutEditor) window.layoutEditor();
+            console.log('代码编辑器已就绪');
+        }).catch(function (err) {
+            self.showCodeEditorError(err);
+        });
+    },
+
+    showCodeEditorError: function(err) {
+        const host = document.getElementById('editor');
+        if (!host) return;
+        const self = this;
+        const msg = (err && err.message) ? err.message : '未知错误';
+        console.error('代码编辑器加载失败:', msg);
+
+        host.innerHTML =
+            '<div class="editor-error">' +
+            '<div class="editor-error-title">代码编辑器加载失败</div>' +
+            '<div class="editor-error-msg">' + msg + '</div>' +
+            '<button class="editor-error-retry" id="editorRetryBtn">重试</button>' +
+            '<div class="editor-error-hint">可视化模式不受影响，可以继续使用。</div>' +
+            '</div>';
+
+        const retry = document.getElementById('editorRetryBtn');
+        if (retry) {
+            retry.addEventListener('click', function () {
+                host.innerHTML = '';
+                if (window.retryMonacoLoad) {
+                    window.retryMonacoLoad().then(function () {
+                        if (!self.isVisualModeActive && window.layoutEditor) window.layoutEditor();
+                    }).catch(function (e) {
+                        self.showCodeEditorError(e);
+                    });
+                } else {
+                    self.ensureCodeEditor();
+                }
+            });
+        }
     },
 
     enableVisualEditing: function() {
@@ -1405,18 +1518,24 @@ syncToEditor: function() {
         
         target.classList.add('edit-selected-element');
         this.selectedElement = target;
-        
+
         this.showElementToolbar(target);
+        if (window.PropertyPanel) {
+            window.PropertyPanel.setElement(target);
+        }
     },
 
     clearElementHighlight: function() {
         if (!this.iframeDoc) return;
-        
+
         const selected = this.iframeDoc.querySelectorAll('.edit-selected-element');
         selected.forEach(el => el.classList.remove('edit-selected-element'));
-        
+
         this.selectedElement = null;
         this.hideElementToolbar();
+        if (window.PropertyPanel) {
+            window.PropertyPanel.clearElement();
+        }
     },
 
     showElementToolbar: function(element) {
@@ -1480,26 +1599,30 @@ syncToEditor: function() {
                 this.clearElementHighlight();
             }
         });
-        
+
         document.getElementById('elementDuplicateBtn').addEventListener('click', () => {
             if (this.selectedElement) {
                 const clone = this.selectedElement.cloneNode(true);
                 this.selectedElement.parentNode.insertBefore(clone, this.selectedElement.nextSibling);
                 this.syncToEditor();
+                // 面板中的引用需指向复制体，否则后续样式编辑作用在旧节点上
+                if (window.PropertyPanel) window.PropertyPanel.setElement(clone);
             }
         });
-        
+
         document.getElementById('elementMoveUpBtn').addEventListener('click', () => {
             if (this.selectedElement && this.selectedElement.previousElementSibling) {
                 this.selectedElement.parentNode.insertBefore(this.selectedElement, this.selectedElement.previousElementSibling);
                 this.syncToEditor();
+                if (window.PropertyPanel) window.PropertyPanel.setElement(this.selectedElement);
             }
         });
-        
+
         document.getElementById('elementMoveDownBtn').addEventListener('click', () => {
             if (this.selectedElement && this.selectedElement.nextElementSibling) {
                 this.selectedElement.parentNode.insertBefore(this.selectedElement.nextElementSibling, this.selectedElement);
                 this.syncToEditor();
+                if (window.PropertyPanel) window.PropertyPanel.setElement(this.selectedElement);
             }
         });
     },
@@ -1538,6 +1661,9 @@ syncToEditor: function() {
         
         var oldDoc = this.iframeDoc;
         this.iframeDoc = this.iframe.contentDocument || this.iframe.contentWindow.document;
+        if (window.PropertyPanel) {
+            window.PropertyPanel.setIframeDoc(this.iframeDoc);
+        }
         
         if (oldDoc && oldDoc !== this.iframeDoc && this.visualUndoRedoHandler) {
             try {
@@ -1545,6 +1671,15 @@ syncToEditor: function() {
             } catch (e) {}
             this.undoRedoListenerAdded = false;
         }
+
+        // 文档已被重写，之前选中的元素节点与历史栈基准都已失效
+        this.selectedElement = null;
+        this.hideElementToolbar();
+        if (window.PropertyPanel) {
+            window.PropertyPanel.clearElement();
+        }
+        this.visualHistory = [this.iframeDoc.body.innerHTML];
+        this.visualHistoryIndex = 0;
         
         const body = this.iframeDoc.body;
         body.contentEditable = true;

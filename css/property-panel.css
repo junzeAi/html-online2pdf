@@ -275,10 +275,10 @@
     min-width: 0;
 }
 
-.preview-panel.expanded {
-    display: flex;
-}
-
+/* 注意：不要在此覆盖 .preview-panel.expanded 的 flex 值。
+   toolbar.css 中已定义 .preview-panel.expanded { flex: 1 }，
+   若这里重定义为 display:flex 会因加载顺序靠后而覆盖它，
+   导致可视化模式下预览区丢失 flex:1、右侧留白。 */
 .preview-panel.expanded-with-panel {
     flex: 1;
 }

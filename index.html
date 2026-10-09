@@ -6,6 +6,7 @@
     <title>HTML预览编辑器</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/toolbar.css">
+    <link rel="stylesheet" href="css/property-panel.css">
     <style>
         .loading-overlay {
             position: fixed;
@@ -48,14 +49,14 @@
         }
     </style>
     <script>
-        window.MONACO_CDN = 'https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.45.0/min/vs';
+        window.MONACO_CDN = './lib/monaco/vs';
     </script>
 </head>
 <body>
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text">正在加载编辑器...</div>
-        <div class="loading-tip">首次加载可能需要几秒钟</div>
+        <div class="loading-text">正在准备编辑器…</div>
+        <div class="loading-tip">代码编辑器按需加载，不占用启动时间</div>
     </div>
     
     <input type="file" id="htmlFileInput" accept=".html,.htm" style="display:none;">
@@ -70,25 +71,44 @@
         </div>
     </div>
 
-    <script src="https://cdn.bootcdn.net/ajax/libs/monaco-editor/0.45.0/min/vs/loader.js"></script>
+    <!-- 注意：不再静态引入 lib/monaco/vs/loader.js。
+         Monaco（3.4MB）改为「进入代码模式」时才按需加载，见 js/editor.js。 -->
     <script src="js/editor.js" defer></script>
     <script src="js/import.js" defer></script>
     <script src="js/toolbar.js" defer></script>
     <script src="js/templates.js" defer></script>
     <script src="js/preview.js" defer></script>
     <script src="js/print.js" defer></script>
+    <script src="js/property-panel.js" defer></script>
     <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                const overlay = document.getElementById('loadingOverlay');
-                if (overlay) {
-                    overlay.classList.add('hidden');
-                    setTimeout(function() {
-                        overlay.remove();
-                    }, 300);
-                }
-            }, 500);
-        });
+        // 遮罩由 editor.js 在应用就绪后移除（不再等待 Monaco）；
+        // 若初始化异常则显示明确错误，而不是静默消失让用户面对空白页
+        window.__hideLoading = function () {
+            const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+            overlay.classList.add('hidden');
+            setTimeout(function () { overlay.remove(); }, 300);
+        };
+        window.__showLoadError = function (reason) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            overlay.innerHTML =
+                '<div style="text-align:center;color:#ccc;font-family:system-ui,sans-serif">' +
+                '<div style="font-size:15px;margin-bottom:10px;">编辑器加载失败</div>' +
+                '<div style="font-size:13px;color:#f28b82;max-width:540px;line-height:1.7;">' + reason + '</div>' +
+                '<button onclick="location.reload()" style="margin-top:20px;padding:8px 20px;background:#007acc;' +
+                'color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">重新加载</button></div>';
+        };
+        // 兜底：应用自身初始化异常时提示（正常情况几百毫秒内就绪，不再依赖 Monaco）
+        setTimeout(function () {
+            if (!window.__appReady && document.getElementById('loadingOverlay')) {
+                window.__showLoadError(
+                    '编辑器长时间未初始化完成。<br>请确认通过本地服务器访问（<code>start-server.bat</code>，' +
+                    '即 <code>http://localhost:8080</code>），<br>而不是直接双击打开 index.html。'
+                );
+            }
+        }, 10000);
     </script>
 </body>
 </html>

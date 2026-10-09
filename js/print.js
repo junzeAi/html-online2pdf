@@ -1,3 +1,26 @@
+function sanitizeFileName(rawTitle, fallback) {
+    let name = String(rawTitle || '')
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')  // Windows 非法字符
+        .replace(/\s+/g, ' ')                 // 压缩连续空白
+        .trim()
+        .replace(/[. ]+$/, '');               // 结尾的点和空格在 Windows 上非法
+
+    // 设备保留名：CON / PRN / AUX / NUL / COM1-9 / LPT1-9
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name)) {
+        name = '_' + name;
+    }
+    if (!name) return fallback || 'document';
+    // 中文按 UTF-16 码元计，留足余量避免超长
+    if (name.length > 60) {
+        name = name.slice(0, 60).replace(/[. ]+$/, '');
+    }
+    return name || (fallback || 'document');
+}
+
+function getDocumentFileBase(doc) {
+    return sanitizeFileName(doc.title, 'document');
+}
+
 function exportPdf() {
     const iframe = document.getElementById('preview');
     if (!iframe || !iframe.contentDocument) {
@@ -11,13 +34,12 @@ function exportPdf() {
     });
     
     const doc = iframe.contentDocument;
-    const title = doc.title || '文档';
-    const safeTitle = title.replace(/[<>:"/\\|?*]/g, '').trim();
-    const titleBase = safeTitle.substring(0, 10) || 'document';
+    const fileName = getDocumentFileBase(doc);
     
-    showFileNamePrompt(`${titleBase}.pdf`, () => {
+    showFileNamePrompt(`${fileName}.pdf`, () => {
         injectPrintStyle(doc);
         try {
+            iframe.contentWindow.focus();
             iframe.contentWindow.print();
         } catch (e) {
             console.error('打印失败:', e);
@@ -59,11 +81,12 @@ function showFileNamePrompt(fileName, callback) {
     overlay.innerHTML = `
         <div class="modal" style="max-width: 450px;">
             <div class="modal-header">
-                <h3>建议文件名</h3>
+                <h3>导出文件名</h3>
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <div style="display: flex; align-items: center; gap: 10px; padding: 12px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
-                    <code id="suggestedFileName" style="flex: 1; color: #007acc; font-size: 14px; word-break: break-all;">${fileName}</code>
+                    <input type="text" id="fileNameInput" value="${fileName}" spellcheck="false"
+                           style="flex: 1; background: transparent; border: none; outline: none; color: #007acc; font-size: 14px; font-family: Consolas, monospace;" />
                     <button id="copyFileNameBtn" title="复制文件名" style="padding: 8px; background: #2d2d2d; border: 1px solid #555; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                             <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -80,7 +103,7 @@ function showFileNamePrompt(fileName, callback) {
                         否则荧光笔效果将无法显示！
                     </p>
                 </div>
-                <p style="margin-top: 12px; color: #888; font-size: 13px; line-height: 1.6;">点击复制按钮后，在打印对话框中按 Ctrl+V 粘贴文件名</p>
+                <p style="margin-top: 12px; color: #888; font-size: 13px; line-height: 1.6;">复制后，在打印对话框的"另存为PDF"文件名框中按 Ctrl+V 粘贴</p>
             </div>
             <div class="modal-footer">
                 <button class="btn" id="cancelFileNameBtn">取消</button>
@@ -91,30 +114,43 @@ function showFileNamePrompt(fileName, callback) {
     
     document.body.appendChild(overlay);
     overlay.classList.add('show');
-    
+
     const copyBtn = document.getElementById('copyFileNameBtn');
     const successMsg = document.getElementById('copySuccessMsg');
-    const fileNameEl = document.getElementById('suggestedFileName');
-    
+    const nameInput = document.getElementById('fileNameInput');
+
+    const currentName = () => sanitizeFileName(
+        (nameInput.value || '').replace(/\.pdf$/i, ''), 'document'
+    ) + '.pdf';
+
+    setTimeout(function() {
+        nameInput.focus();
+        const dot = nameInput.value.lastIndexOf('.');
+        if (dot > 0) nameInput.setSelectionRange(0, dot);
+    }, 60);
+
+    const doCopy = function(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        nameInput.value = text;
+        nameInput.select();
+        try {
+            document.execCommand('copy');
+            return Promise.resolve();
+        } catch (err) {
+            return Promise.reject(err);
+        }
+    };
+
     copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(fileName).then(() => {
+        doCopy(currentName()).then(() => {
             successMsg.style.display = 'block';
             setTimeout(() => {
                 successMsg.style.display = 'none';
             }, 2000);
         }).catch(() => {
-            const textArea = document.createElement('textarea');
-            textArea.value = fileName;
-            textArea.style.position = 'fixed';
-            textArea.style.opacity = '0';
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            successMsg.style.display = 'block';
-            setTimeout(() => {
-                successMsg.style.display = 'none';
-            }, 2000);
+            alert('复制失败，请手动选中文本后复制');
         });
     });
     
@@ -129,10 +165,17 @@ function showFileNamePrompt(fileName, callback) {
         overlay.classList.remove('show');
         setTimeout(() => {
             document.body.removeChild(overlay);
-            if (callback) callback();
+            if (callback) callback(currentName());
         }, 200);
     });
     
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('continuePrintBtn').click();
+        }
+    });
+
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             overlay.classList.remove('show');
@@ -150,30 +193,26 @@ function exportHtml() {
         return;
     }
     
-    const selectedElements = iframe.contentDocument.querySelectorAll('.edit-selected-element, .edit-hover-element');
-    selectedElements.forEach(el => {
-        el.classList.remove('edit-selected-element', 'edit-hover-element');
-    });
-    
     const doc = iframe.contentDocument;
-    const htmlContent = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+    // 复用与源码同步同一套清洗逻辑，避免把编辑器注入的样式导出给用户
+    const htmlContent = window.FormatToolbar
+        ? window.FormatToolbar.getCleanHTML(doc)
+        : '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
     
-    const title = doc.title || '文档';
-    const safeTitle = title.replace(/[<>:"/\\|?*]/g, '').trim();
-    const titleBase = safeTitle.substring(0, 10) || 'document';
+    const fileName = getDocumentFileBase(doc);
     
     const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     
     a.href = url;
-    a.download = `${titleBase}.html`;
+    a.download = `${fileName}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    console.log('HTML文件已导出:', titleBase);
+    console.log('HTML文件已导出:', fileName);
 }
 
 function initPrint() {

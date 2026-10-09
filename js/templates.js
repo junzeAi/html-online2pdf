@@ -800,7 +800,10 @@ showTemplateSelector: function() {
             try {
                 window.setEditorContent(template.html);
                 console.log('模板内容已设置到编辑器');
-                
+                if (window.EditorStorage) {
+                    window.EditorStorage.save();
+                }
+
                 requestAnimationFrame(() => {
                     if (window.refreshPreview) {
                         window.refreshPreview();

@@ -15,10 +15,16 @@ function initImport() {
         reader.onload = function(event) {
             const content = event.target.result;
             
-            if (window.setEditorContent) {
+            if (typeof window.setEditorContent === 'function') {
                 window.setEditorContent(content);
                 
-                if (window.onEditorChange) {
+                if (window.EditorStorage) {
+                    window.EditorStorage.save();
+                }
+                // 导入视为「载入新文档」，预览从顶部开始
+                if (window.refreshPreview) {
+                    window.refreshPreview();
+                } else if (window.onEditorChange) {
                     window.onEditorChange();
                 }
                 

@@ -304,6 +304,16 @@ const PropertyPanel = {
     setIframeDoc: function(doc) {
         this.iframeDoc = doc;
     },
+
+    // 属性面板仅在可视化模式下有意义
+    setVisible: function(visible) {
+        if (this.panel) {
+            this.panel.style.display = visible ? 'flex' : 'none';
+        }
+        if (!visible) {
+            this.clearElement();
+        }
+    },
     
     setElement: function(element) {
         this.selectedElement = element;
@@ -325,7 +335,8 @@ const PropertyPanel = {
     updatePanelVisibility: function() {
         const emptyDiv = document.getElementById('propertyPanelEmpty');
         const formDiv = document.getElementById('propertyPanelForm');
-        
+        if (!emptyDiv || !formDiv) return;
+
         if (this.selectedElement) {
             emptyDiv.style.display = 'none';
             formDiv.style.display = 'block';
@@ -485,11 +496,16 @@ const PropertyPanel = {
     syncToEditor: function() {
         if (!this.iframeDoc) return;
         
-        const content = this.iframeDoc.documentElement.outerHTML;
-        const html = '<!DOCTYPE html>\n' + content;
+        // 复用工具栏的清洗逻辑，避免把注入样式同步回源码
+        const html = window.FormatToolbar
+            ? window.FormatToolbar.getCleanHTML(this.iframeDoc)
+            : '';
         
-        if (window.setEditorContent) {
+        if (html && window.setEditorContent) {
             window.setEditorContent(html);
+        }
+        if (window.FormatToolbar && window.FormatToolbar.saveVisualState) {
+            window.FormatToolbar.saveVisualState();
         }
     },
     
