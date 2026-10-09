@@ -172,6 +172,23 @@ function injectPrintStyle(doc) {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
+            /* 分页保护（只影响在哪里断开，不改外观）：
+               · 标题不要孤零零留在页尾
+               · 表格行 / 图片 / 图注不要被拦腰截断
+               · 段落不要出现单行孤行
+               刻意不给 table 本身加 break-inside —— 长表格会被整体推到下一页、留大片空白。 */
+            h1, h2, h3, h4, h5, h6 {
+                break-after: avoid;
+                page-break-after: avoid;
+            }
+            tr, img, svg, figure, pre, blockquote {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            p, li {
+                orphans: 2;
+                widows: 2;
+            }
             /* 老文档的荧光笔：覆盖掉含 transparent 的旧内联样式。
                含 transparent 的渐变会让 Chrome 在 PDF 里生成软掩码，
                部分阅读器渲染不了 → 荧光笔整块消失。 */

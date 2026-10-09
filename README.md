@@ -126,6 +126,7 @@ js/
   lib/monaco/           本地化的 Monaco Editor（0.45.0 min 构建，约 18MB，按需加载）
 docs/
   DEPLOY.md             部署与性能优化指南（含 QNAP 配置）
+  PRINT-GUIDE.md        打印级 HTML/CSS 编写规范（怎么写才能打印得准）
   superpowers/          设计文档与实施计划
 ```
 
