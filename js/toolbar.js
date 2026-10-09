@@ -1228,7 +1228,7 @@ syncToEditor: function() {
                     </svg>
                     <div>
                         <div class="export-option-title">导出 PDF</div>
-                        <div class="export-option-desc">使用浏览器打印功能导出为PDF文件</div>
+                        <div class="export-option-desc">打开打印窗口，目标选「另存为 PDF」<br>文件名已自动填好；首次请勾选「背景图形」</div>
                     </div>
                 </button>
                 <button class="export-option" id="exportHtmlOption">

@@ -21,31 +21,92 @@ function getDocumentFileBase(doc) {
     return sanitizeFileName(doc.title, 'document');
 }
 
+/* ------------------------------------------------------------------ *
+ * 打印窗口的文件名
+ *
+ * Chrome / Edge 取「顶层页面标题」当 PDF 默认文件名，**不认** iframe 的标题；
+ * Firefox 则取 iframe 自己的标题。两边都设上，打印窗口里的文件名才会是
+ * 文档标题，用户不必再到「另存为」里手动改。
+ * ------------------------------------------------------------------ */
+
+let printTitleBackup = null;    // { top, frame }
+let printRestoreTimer = null;
+
+function applyPrintTitle(fileName) {
+    restorePrintTitle();        // 先确保处于干净状态
+
+    const iframe = document.getElementById('preview');
+    printTitleBackup = { top: document.title, frame: null };
+
+    document.title = fileName;
+
+    try {
+        const doc = iframe && iframe.contentDocument;
+        if (doc) {
+            printTitleBackup.frame = doc.title;
+            doc.title = fileName;
+        }
+    } catch (e) { /* 跨域等情况下跳过 */ }
+
+    // 打印结束就还原，避免改动的标题残留进「导出 HTML」
+    try {
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.addEventListener('afterprint', restorePrintTitle, { once: true });
+        }
+    } catch (e) {}
+
+    // afterprint 在部分浏览器或取消打印时不可靠，加时间兜底
+    clearTimeout(printRestoreTimer);
+    printRestoreTimer = setTimeout(restorePrintTitle, 60000);
+}
+
+function restorePrintTitle() {
+    clearTimeout(printRestoreTimer);
+    if (!printTitleBackup) return;
+
+    const backup = printTitleBackup;
+    printTitleBackup = null;
+
+    try { document.title = backup.top; } catch (e) {}
+
+    if (backup.frame !== null) {
+        try {
+            const doc = document.getElementById('preview').contentDocument;
+            if (doc) doc.title = backup.frame;
+        } catch (e) {}
+    }
+}
+
 function exportPdf() {
     const iframe = document.getElementById('preview');
     if (!iframe || !iframe.contentDocument) {
         alert('预览区域未加载');
         return;
     }
-    
-    const selectedElements = iframe.contentDocument.querySelectorAll('.edit-selected-element, .edit-hover-element');
-    selectedElements.forEach(el => {
+
+    const doc = iframe.contentDocument;
+
+    // 导出前清掉编辑器加的高亮框，否则蓝框会被打进 PDF
+    doc.querySelectorAll('.edit-selected-element, .edit-hover-element').forEach(el => {
         el.classList.remove('edit-selected-element', 'edit-hover-element');
     });
-    
-    const doc = iframe.contentDocument;
-    const fileName = getDocumentFileBase(doc);
-    
-    showFileNamePrompt(`${fileName}.pdf`, () => {
-        injectPrintStyle(doc);
-        try {
-            iframe.contentWindow.focus();
-            iframe.contentWindow.print();
-        } catch (e) {
-            console.error('打印失败:', e);
-            alert('请使用浏览器打印功能（Ctrl+P），或尝试在新窗口中打开预览后打印');
-        }
-    });
+
+    // 文件名取自文档的 <title>；文档没有标题时回退为 document.pdf
+    const fileName = getDocumentFileBase(doc) + '.pdf';
+
+    injectPrintStyle(doc);
+    applyPrintTitle(fileName);
+
+    try {
+        iframe.contentWindow.focus();
+        // 浏览器不允许网页静默生成 PDF（安全模型限制），
+        // 这里打开的就是系统打印窗口，用户选「另存为 PDF」即可。
+        iframe.contentWindow.print();
+    } catch (e) {
+        console.error('打印失败:', e);
+        restorePrintTitle();
+        alert('无法打开打印窗口，请改用浏览器自带的 Ctrl+P。');
+    }
 }
 
 function injectPrintStyle(doc) {
@@ -74,117 +135,8 @@ function injectPrintStyle(doc) {
     doc.head.appendChild(style);
 }
 
-function showFileNamePrompt(fileName, callback) {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.id = 'fileNamePromptOverlay';
-    overlay.innerHTML = `
-        <div class="modal" style="max-width: 450px;">
-            <div class="modal-header">
-                <h3>导出文件名</h3>
-            </div>
-            <div class="modal-body" style="padding: 20px;">
-                <div style="display: flex; align-items: center; gap: 10px; padding: 12px; background: #1e1e1e; border-radius: 6px; border: 1px solid #444;">
-                    <input type="text" id="fileNameInput" value="${fileName}" spellcheck="false"
-                           style="flex: 1; background: transparent; border: none; outline: none; color: #007acc; font-size: 14px; font-family: Consolas, monospace;" />
-                    <button id="copyFileNameBtn" title="复制文件名" style="padding: 8px; background: #2d2d2d; border: 1px solid #555; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
-                </div>
-                <p id="copySuccessMsg" style="margin-top: 10px; color: #28a745; font-size: 13px; display: none;">✓ 已复制到剪贴板</p>
-                <div style="margin-top: 16px; padding: 12px; background: #fff3cd; border-left: 3px solid #ffc107; border-radius: 4px;">
-                    <p style="margin: 0; color: #856404; font-size: 13px; line-height: 1.6;">
-                        <strong>⚠️ 重要提示：</strong><br>
-                        在打印对话框中，请确保勾选<br>
-                        <strong>"打印背景图形"</strong> 选项，<br>
-                        否则荧光笔效果将无法显示！
-                    </p>
-                </div>
-                <p style="margin-top: 12px; color: #888; font-size: 13px; line-height: 1.6;">复制后，在打印对话框的"另存为PDF"文件名框中按 Ctrl+V 粘贴</p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn" id="cancelFileNameBtn">取消</button>
-                <button class="btn btn-primary" id="continuePrintBtn">继续打印</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    overlay.classList.add('show');
-
-    const copyBtn = document.getElementById('copyFileNameBtn');
-    const successMsg = document.getElementById('copySuccessMsg');
-    const nameInput = document.getElementById('fileNameInput');
-
-    const currentName = () => sanitizeFileName(
-        (nameInput.value || '').replace(/\.pdf$/i, ''), 'document'
-    ) + '.pdf';
-
-    setTimeout(function() {
-        nameInput.focus();
-        const dot = nameInput.value.lastIndexOf('.');
-        if (dot > 0) nameInput.setSelectionRange(0, dot);
-    }, 60);
-
-    const doCopy = function(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            return navigator.clipboard.writeText(text);
-        }
-        nameInput.value = text;
-        nameInput.select();
-        try {
-            document.execCommand('copy');
-            return Promise.resolve();
-        } catch (err) {
-            return Promise.reject(err);
-        }
-    };
-
-    copyBtn.addEventListener('click', () => {
-        doCopy(currentName()).then(() => {
-            successMsg.style.display = 'block';
-            setTimeout(() => {
-                successMsg.style.display = 'none';
-            }, 2000);
-        }).catch(() => {
-            alert('复制失败，请手动选中文本后复制');
-        });
-    });
-    
-    document.getElementById('cancelFileNameBtn').addEventListener('click', () => {
-        overlay.classList.remove('show');
-        setTimeout(() => {
-            document.body.removeChild(overlay);
-        }, 200);
-    });
-    
-    document.getElementById('continuePrintBtn').addEventListener('click', () => {
-        overlay.classList.remove('show');
-        setTimeout(() => {
-            document.body.removeChild(overlay);
-            if (callback) callback(currentName());
-        }, 200);
-    });
-    
-    nameInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('continuePrintBtn').click();
-        }
-    });
-
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            overlay.classList.remove('show');
-            setTimeout(() => {
-                document.body.removeChild(overlay);
-            }, 200);
-        }
-    });
-}
+/* 说明：原先这里有一个「导出文件名」弹窗，让用户复制文件名再粘贴到打印窗口。
+   现在打印窗口的文件名由 applyPrintTitle() 自动填好，这一步已无必要，故移除。 */
 
 function exportHtml() {
     const iframe = document.getElementById('preview');
@@ -192,7 +144,10 @@ function exportHtml() {
         alert('预览区域未加载');
         return;
     }
-    
+
+    // 若刚打印过且标题尚未还原，先还原，避免把导出用的文件名写进 HTML 的 <title>
+    restorePrintTitle();
+
     const doc = iframe.contentDocument;
     // 复用与源码同步同一套清洗逻辑，避免把编辑器注入的样式导出给用户
     const htmlContent = window.FormatToolbar
@@ -218,6 +173,10 @@ function exportHtml() {
 function initPrint() {
     window.exportPdf = exportPdf;
     window.exportHtml = exportHtml;
+
+    // 打印窗口关闭后立刻还原页面标题（applyPrintTitle 里还设了时间兜底）
+    window.addEventListener('afterprint', restorePrintTitle);
+
     console.log('导出功能初始化完成');
 }
 
