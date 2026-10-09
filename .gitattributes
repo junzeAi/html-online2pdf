@@ -1,0 +1,28 @@
+# 统一换行符：仓库里一律存 LF。
+#
+# 为什么需要这个文件：
+#   Windows 的工作区默认是 CRLF、仓库里是 LF，若把 Windows 上的文件直接拷到
+#   Linux（如 QNAP NAS）的 git 工作区，就会出现「同一份代码、换行符不同」，
+#   git 会认为文件有本地改动，导致 `git pull` 报
+#   "Your local changes would be overwritten by merge" 而中断。
+#   显式声明 eol=lf 后，各平台检出都是 LF，这类冲突不会再出现。
+* text=auto eol=lf
+
+# Windows 批处理必须保留 CRLF —— LF 结尾可能导致 goto/label 等执行异常
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件：不做任何换行符转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.bmp  binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.br   binary
