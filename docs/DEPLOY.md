@@ -242,6 +242,39 @@ location ~* ^/lib/.*\.(js|css|ttf|svg)$ {
 
 ## 六、常见问题
 
+**Q：NAS 上 `git pull` 报「Your local changes would be overwritten by merge」？**
+
+A：几乎都是**换行符不一致**造成的 —— 仓库里存的是 LF，而工作区里那几个文件是 CRLF，
+git 因此认为它们有"本地改动"。按下面顺序处理（**顺序不能反**）：
+
+```bash
+cd <你的网站目录>
+
+# ① 先确认差异到底是什么：这条命令忽略行尾差异
+#    如果输出为空 → 纯粹是换行符问题，可以放心丢弃
+git diff --ignore-cr-at-eol --stat
+
+# ② 关掉自动换行符转换（Linux 上本就不该开）
+git config core.autocrlf false
+
+# ③ 丢弃这几个文件的本地改动
+git checkout -- README.md js/print.js js/toolbar.js
+
+# ④ 重新拉取
+git pull
+```
+
+> ⚠️ 一定要**先做 ② 再做 ③**。若 NAS 上 `core.autocrlf=true` 而先执行了 checkout，
+> 会又写出 CRLF 版本，下次拉取继续冲突。
+
+> 仓库已包含 `.gitattributes`（`* text=auto eol=lf`），理论上不会再出现这个问题。
+> 如果你的目录是在该文件加入之前 clone 的，按上面步骤清一次即可。
+
+**Q：本地 Windows 上编辑的文件拷到 NAS 后，git 说有改动？**
+
+A：同样是换行符问题。Windows 工作区是 CRLF、仓库是 LF。
+改用 `git pull` 更新，或者把 `core.autocrlf` 设为 `false` 后重新检出。
+
 **Q：为什么本地 `start-server.bat` 不慢？**
 A：本机读盘不占带宽。慢的是**网络传输**，NAS 到浏览器的距离与带宽决定体感。
 （不过现在首屏只有 190 KB，这个差异已经不明显了。）
