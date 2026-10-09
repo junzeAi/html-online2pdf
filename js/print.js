@@ -110,12 +110,27 @@ function exportPdf() {
 }
 
 function injectPrintStyle(doc) {
-    const existingStyle = doc.getElementById('printStyle');
-    if (existingStyle) return;
-    
-    const style = doc.createElement('style');
-    style.id = 'printStyle';
+    // 用 upsert 而不是「已存在就跳过」：加荧光笔时 toolbar.js 会先建一个较弱的
+    // printStyle，若这里直接 return，@page 规则就永远注入不进去。
+    let style = doc.getElementById('printStyle');
+    if (!style) {
+        style = doc.createElement('style');
+        style.id = 'printStyle';
+        doc.head.appendChild(style);
+    }
+
     style.textContent = `
+        /* 必须显式声明纸张尺寸。
+           不声明时 Chrome 会按「屏幕尺寸」猜，从而整页缩放 —— 缩放会同时导致：
+             · 选区位置按未缩放坐标计算 → 选中的文字对不上（选不准）
+             · 插入光标按未缩放字号渲染 → 光标显得特别大
+           声明 A4 + 零页边距后可用宽度是完整的 210mm，文档按自身的内边距留白，
+           缩放保持 100%，上述两个现象随之消失。 */
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
         @media print {
             body {
                 -webkit-print-color-adjust: exact !important;
@@ -128,11 +143,13 @@ function injectPrintStyle(doc) {
             .highlighter-mark {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
-                background: linear-gradient(to bottom, transparent 50%, var(--hl-color, #ffeb3b) 50%) !important;
             }
+            /* 切勿在此覆盖 .highlighter-mark 的 background。
+               荧光笔颜色是内联写在 span 上的，而这里的规则带 !important 会盖掉内联样式。
+               历史教训：曾写成 var(--hl-color, #ffeb3b)，但 --hl-color 从未被定义过，
+               于是 8 种颜色打印出来全变成黄色。内联的 linear-gradient 本身已能正确打印。 */
         }
     `;
-    doc.head.appendChild(style);
 }
 
 /* 说明：原先这里有一个「导出文件名」弹窗，让用户复制文件名再粘贴到打印窗口。
