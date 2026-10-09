@@ -109,6 +109,34 @@ function exportPdf() {
     }
 }
 
+/**
+ * 为「旧写法」的荧光笔生成打印覆盖规则。
+ *
+ * 新版荧光笔已改用不透明写法（不产生软掩码），但用户既有文档里的 span 仍带着
+ * 旧的 `linear-gradient(..., transparent ...)` 内联样式。这里按 data-hl-color
+ * 用样式表 !important 覆盖内联样式（作者 !important > 普通内联），
+ * 让老文档在打印时同样不需要软掩码。
+ */
+function buildOldHighlighterPrintRules() {
+    const fallback = ['#ffeb3b', '#a5d6a7', '#81d4fa', '#f8bbd9',
+                      '#ffcc80', '#ce93d8', '#ef9a9a', '#80cbc4'];
+    let colors = fallback;
+    try {
+        if (window.FormatToolbar && Array.isArray(window.FormatToolbar.highlighterColors)) {
+            colors = window.FormatToolbar.highlighterColors.map(c => c.color);
+        }
+    } catch (e) { /* 用默认色板 */ }
+
+    return colors.map(function (c) {
+        return '.highlighter-mark[data-hl-color="' + c + '"] {' +
+            ' background-image: linear-gradient(' + c + ', ' + c + ') !important;' +
+            ' background-size: 100% 50% !important;' +
+            ' background-position: 0 100% !important;' +
+            ' background-repeat: no-repeat !important;' +
+            ' }';
+    }).join('\n            ');
+}
+
 function injectPrintStyle(doc) {
     // 用 upsert 而不是「已存在就跳过」：加荧光笔时 toolbar.js 会先建一个较弱的
     // printStyle，若这里直接 return，@page 规则就永远注入不进去。
@@ -144,10 +172,13 @@ function injectPrintStyle(doc) {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            /* 切勿在此覆盖 .highlighter-mark 的 background。
-               荧光笔颜色是内联写在 span 上的，而这里的规则带 !important 会盖掉内联样式。
+            /* 老文档的荧光笔：覆盖掉含 transparent 的旧内联样式。
+               含 transparent 的渐变会让 Chrome 在 PDF 里生成软掩码，
+               部分阅读器渲染不了 → 荧光笔整块消失。 */
+            ${buildOldHighlighterPrintRules()}
+            /* 切勿覆盖 .highlighter-mark 的 background 颜色本身。
                历史教训：曾写成 var(--hl-color, #ffeb3b)，但 --hl-color 从未被定义过，
-               于是 8 种颜色打印出来全变成黄色。内联的 linear-gradient 本身已能正确打印。 */
+               于是 8 种颜色打印出来全变成黄色。 */
         }
     `;
 }

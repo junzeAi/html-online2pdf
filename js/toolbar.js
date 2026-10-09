@@ -434,7 +434,17 @@ const FormatToolbar = {
             const span = doc.createElement('span');
             span.className = 'highlighter-mark';
             span.setAttribute('data-hl-color', color);
-            span.style.cssText = `background: linear-gradient(to bottom, transparent 50%, ${color} 50%); -webkit-print-color-adjust: exact; print-color-adjust: exact;`;
+            // 用「不透明纯色 + background-size 只画下半」代替含 transparent 的渐变。
+            // 原因（2026-10 实测）：transparent 会逼 Chrome 在 PDF 里生成
+            // 「透明度组 + 亮度软掩码」(/SMask)，而不少 PDF 阅读器渲染软掩码会失败，
+            // 表现为「打印预览里荧光笔正常、存成 PDF 打开却整块消失」。
+            // 不透明写法全程 alpha=1，PDF 里不需要软掩码，视觉与半抹效果完全一致。
+            span.style.cssText =
+                `background-image: linear-gradient(${color}, ${color});` +
+                ` background-size: 100% 50%;` +
+                ` background-position: 0 100%;` +
+                ` background-repeat: no-repeat;` +
+                ` -webkit-print-color-adjust: exact; print-color-adjust: exact;`;
             
             try {
                 range.surroundContents(span);
